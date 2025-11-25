@@ -1,1 +1,78 @@
+1. Create a query that calculates the average number of goals per game between 1900 and 2000.
 
+   SELECT
+   AVG(home_score + away_score) AS [averagegoalspergame] //home_score + away_score
+   FROM results
+   WHERE date BETWEEN "1900-01-01" AND "2000-12-31";
+
+2. Create a query that counts the number of shootouts wins by country and arrange in alphabetical order.
+
+   SELECT 
+   winner AS country,
+   COUNT(*) AS shootoutwins
+   FROM shootouts
+   GROUP BY winner
+   ORDER BY country ASC;
+
+3. Create a reliable key that allows the joining together of goal scorers, results, and shootouts.
+
+   To reliably join the 3 tables together (goalscorers, results and shootouts) we need to to see what uniquely identifies each match across the tables. 
+   The combination of date, home_team and away_team uniquely identifies every match in the dataset and these fields exist in all three tables.
+   Therefore this serves as a reliable key joining together goalscorers, results, and shootouts.
+
+
+
+4. Create a query that identifies which teams have won a penalty shootout after a 1-1 draw.
+
+   SELECT shootouts.winner
+   FROM results
+   JOIN shootouts 
+   ON results.home_team = shootouts.home_team AND results.away_team = shootouts.away_team AND results.date = shootouts.date
+   WHERE home_score = 1 AND away_score = 1
+   GROUP BY shootouts.winner;
+
+
+
+
+5.Create a query that identifies the top goal scorer by tournament, and what percentage that equates to for all
+  goals scored in the tournament.
+
+  WITH scorer_goals AS (
+  SELECT
+  results.tournament,
+  goalscorers.scorer,
+  COUNT(*) AS goals
+  FROM goalscorers
+  JOIN results
+  ON goalscorers.date = results.date
+  AND goalscorers.home_team = results.home_team
+  AND goalscorers.away_team = results.away_team
+  GROUP BY results.tournament, goalscorers.scorer
+  ),
+  with_totals AS (
+  SELECT
+  tournament,
+  scorer,
+  goals,
+  SUM(goals) OVER (PARTITION BY tournament) AS total_tournament_goals
+  FROM scorer_goals
+  ),
+  ranked AS (
+  SELECT
+  tournament,
+  scorer,
+  goals,
+  total_tournament_goals,
+  ROUND(goals * 100.0 / total_tournament_goals, 2) AS scorer_goals_percentage,
+  RANK() OVER (PARTITION BY tournament ORDER BY goals DESC) AS rank
+  FROM with_totals
+  )
+  SELECT
+  tournament,
+  scorer AS top_scorer,
+  goals,
+  total_tournament_goals AS total_goals,
+  scorer_goals_percentage
+  FROM ranked
+  WHERE rank = 1
+  ORDER BY tournament;
